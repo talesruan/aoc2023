@@ -7,38 +7,48 @@ console.time("Elapsed time");
 const fn = input => {
 	const data = parseInput(input);
 	const grid = new Grid(data);
-	//display(grid);
-
-	let sumOfPartNumbers = 0;
+	const partNumbersAdjacentToStars = {};
 	for (let y = 0; y < grid.sizeY; y++) {
 		let number = "";
-		let isAdjacentToSymbol = false;
+		let adjacentStars = new Set();
 		for (let x = 0; x < grid.sizeX; x++) {
 			const char = grid.get(x, y);
 			if (isNumber(char)) {
 				number += char;
-				if (grid.getAdjacentValues(x, y).some(value => isSymbol(value))) isAdjacentToSymbol = true;
+				for (const coord of grid.getAdjacentCoords(x, y)) {
+					const value = grid.get(coord.x, coord.y);
+					if (value !== "*") continue;
+					const coordStr = `${coord.x},${coord.y}`
+					adjacentStars.add(coordStr);
+				}
 			} else {
-				if (number.length > 0 && isAdjacentToSymbol) {
-					sumOfPartNumbers += parseInt(number);
+				if (number.length > 0) {
+					for (const starCoordinates of adjacentStars.values()) {
+						partNumbersAdjacentToStars[starCoordinates] = partNumbersAdjacentToStars[starCoordinates] || [];
+						partNumbersAdjacentToStars[starCoordinates].push(parseInt(number));
+					}
 				}
 				number = "";
-				isAdjacentToSymbol = false;
+				adjacentStars = new Set();
 			}
 		}
-		if (number.length > 0 && isAdjacentToSymbol) {
-			sumOfPartNumbers += parseInt(number);
+		if (number.length > 0) {
+			for (const starCoordinates of adjacentStars.values()) {
+				partNumbersAdjacentToStars[starCoordinates] = partNumbersAdjacentToStars[starCoordinates] || [];
+				partNumbersAdjacentToStars[starCoordinates].push(parseInt(number));
+			}
 		}
 	}
-	return sumOfPartNumbers;
+
+	const gearCoords = Object.keys(partNumbersAdjacentToStars).filter(coord => partNumbersAdjacentToStars[coord].length === 2);
+	console.log(`Found ${gearCoords.length} gears.`);
+	const gearRatios = gearCoords.map(gc => partNumbersAdjacentToStars[gc].reduce((a, b) => a * b));
+	const sumOfGearRatios = gearRatios.reduce((a, b) => a + b);
+	return sumOfGearRatios;
 };
 
 const isNumber = (str) => {
 	return ["0","1","2","3","4","5","6","7","8","9"].includes(str);
-};
-
-const isSymbol = (str) => {
-	return str !== "." && !isNumber(str);
 };
 
 const parseInput = input => {
@@ -60,14 +70,6 @@ class Grid {
 		if (this.matrix.length > 0) this.sizeX = this.matrix[0].length;
 	}
 
-	iterate (func) {
-		for (let y = 0; y < this.sizeY; y++) {
-			for (let x = 0; x < this.sizeX; x++) {
-				func(x, y);
-			}
-		}
-	}
-
 	getAdjacentValues (x, y) {
 		return this.getAdjacentCoords(x, y).map(coord => this.get(coord.x, coord.y));
 	}
@@ -78,7 +80,7 @@ class Grid {
 			{x: x + 0, y: y - 1},
 			{x: x + 1, y: y - 1},
 			{x: x - 1, y: y + 0},
-			//{x: x + 0, y: y + 0},
+
 			{x: x + 1, y: y + 0},
 			{x: x - 1, y: y + 1},
 			{x: x + 0, y: y + 1},
