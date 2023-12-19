@@ -1,7 +1,5 @@
 const fs = require("fs");
-
 const input = fs.readFileSync("demoinput.txt", "utf8");
-console.time("Elapsed time");
 
 const fn = input => {
 	const data = parseInput(input);
@@ -17,5 +15,6 @@ const parseInput = input => {
 	return data;
 };
 
+console.time("Elapsed time");
 console.log("Result: ", fn(input));
 console.timeEnd("Elapsed time");
