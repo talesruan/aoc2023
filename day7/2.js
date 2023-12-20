@@ -9,11 +9,14 @@ const TWO_PAIR = 3;
 const ONE_PAIR = 2;
 const HIGH_CARD = 1;
 
-const labels = ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"];
+const labels = ["J", "2", "3", "4", "5", "6", "7", "8", "9", "T", "Q", "K", "A"];
+const jokerLabel = "J";
 
 const fn = input => {
 	const data = parseInput(input);
-	for (const run of data) run.type = getHandType(run.hand);
+	for (const run of data) {
+		run.type = getHandType(run.hand);
+	}
 	const sortedRuns = data.sort((runA, runB) => {
 		if (runA.type !== runB.type) return runA.type - runB.type;
 		return compareHandsCardByCard(runA.hand, runB.hand);
@@ -44,7 +47,11 @@ const getHandType = hand => {
 		if (!countByLabel[card]) countByLabel[card] = 0;
 		countByLabel[card]++;
 	}
+	let numberOfJokers = countByLabel[jokerLabel] || 0;
+	delete countByLabel[jokerLabel];
+	if (numberOfJokers === 5) return FIVE_OF_A_KIND;
 	const sortedLabelCounts = Object.values(countByLabel).sort((a, b) => b-a);
+	sortedLabelCounts[0] += numberOfJokers;
 	if (sortedLabelCounts[0] === 5) return FIVE_OF_A_KIND;
 	if (sortedLabelCounts[0] === 4) return FOUR_OF_A_KIND;
 	if (sortedLabelCounts[0] === 3) {
