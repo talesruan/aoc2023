@@ -13,14 +13,14 @@ const fn = input => {
 };
 
 const predictPreviousValue = array => {
-	const firstValues = [];
+	const firstValues = [array[0]];
 	let workArray = [...array];
 	while (!isAllZeroes(workArray)) {
 		workArray = getDifferences(workArray);
 		firstValues.push(workArray[0]);
 	}
-	const decrement = firstValues.reverse().reduce((a, b) => b - a);
-	return array[0] - decrement;
+	const previousValue = firstValues.reverse().reduce((a, b) => b - a);
+	return previousValue;
 };
 
 const isAllZeroes = array => {
