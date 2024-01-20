@@ -2,41 +2,39 @@ const fs = require("fs");
 // const input = fs.readFileSync("demoinput.txt", "utf8");
 const input = fs.readFileSync("input.txt", "utf8");
 
-const UNIVERSE_EXPANSION = 1000000; // Only thing that changed from the part 1.
+const UNIVERSE_EXPANSION = 1000000; // Only thing that actually changed from the part 1. The rest is just refactoring.
 
 const fn = input => {
 	const data = parseInput(input);
-	const numberOfLines = data.length;
 	const galaxies = findGalaxies(data);
-	const galaxiesPerRow = "0".repeat(numberOfLines).split("").map(x => parseInt(x));
-	const galaxiesPerCol = "0".repeat(data[0].length).split("").map(x => parseInt(x));
+	const galaxiesPerRow = [];
+	const galaxiesPerCol = [];
 	for (const galaxy of galaxies) {
-		galaxiesPerRow[galaxy.y]++;
-		galaxiesPerCol[galaxy.x]++;
+		galaxiesPerRow[galaxy.y] = true;
+		galaxiesPerCol[galaxy.x] = true;
 	}
 	const galaxyPairs = getPairs(galaxies);
 	let sumOfSteps = 0;
 	for (const galaxyPair of galaxyPairs) {
-		const galaxy1 = galaxyPair[0];
-		const galaxy2 = galaxyPair[1];
-		let steps = 0;
-		for (let i = galaxy1.x; i !== galaxy2.x ; i += (Math.sign(galaxy2.x - galaxy1.x))) {
-			if (galaxiesPerCol[i] === 0) {
-				steps += UNIVERSE_EXPANSION;
-			} else {
-				steps ++;
-			}
-		}
-		for (let i = galaxy1.y; i !== galaxy2.y ; i += (Math.sign(galaxy2.y - galaxy1.y))) {
-			if (galaxiesPerRow[i] === 0) {
-				steps += UNIVERSE_EXPANSION;
-			} else {
-				steps ++;
-			}
-		}
+		const steps = moveAlongAxis(galaxyPair, "x", galaxiesPerCol) + moveAlongAxis(galaxyPair, "y", galaxiesPerRow);
 		sumOfSteps += steps;
 	}
 	return sumOfSteps;
+};
+
+const moveAlongAxis = (galaxyPair, axis, galaxiesOnTheWay) => {
+	const galaxy1 = galaxyPair[0];
+	const galaxy2 = galaxyPair[1];
+	const stepDirection = Math.sign(galaxy2[axis] - galaxy1[axis]);
+	let steps = 0;
+	for (let i = galaxy1[axis]; i !== galaxy2[axis] ; i += stepDirection) {
+		if (!galaxiesOnTheWay[i]) {
+			steps += UNIVERSE_EXPANSION;
+		} else {
+			steps ++;
+		}
+	}
+	return steps;
 };
 
 const getPairs = array => {
