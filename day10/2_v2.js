@@ -1,3 +1,7 @@
+/**
+ * A more efficient version using scanlines
+ *
+ */
 const fs = require("fs");
 const input = fs.readFileSync("input.txt", "utf8");
 
@@ -11,6 +15,8 @@ const Direction = {
 	EAST: {x: 1, y: 0} // ->
 };
 
+const Directions = Object.values(Direction);
+
 const pipeConnections = {
 	"|": [Direction.NORTH, Direction.SOUTH],
 	"-": [Direction.WEST, Direction.EAST],
@@ -22,66 +28,70 @@ const pipeConnections = {
 
 const fn = input => {
 	const data = parseInput(input);
-	const grid = new Grid(data);
+	let grid = new Grid(data);
 	const animalCoords = findAnimal(grid);
-	const distanceMap = buildDistanceMap(grid, animalCoords.x, animalCoords.y);
-	let maxDistance = 0;
-	distanceMap.iterate((x,y) => {
-		const value = distanceMap.get(x, y);
-		if (value > maxDistance) maxDistance = value;
+	const mainLoop = getMainLoop(grid, animalCoords.x, animalCoords.y);
+	grid.iterate((x, y) => {
+		if (mainLoop.some(xy => xy.x === x && xy.y === y)) {
+			grid.set(x, y, grid.get(x, y));
+		} else {
+			grid.set(x, y, GROUND);
+		}
 	});
-	return maxDistance;
+
+	let count = 0;
+	for (let y = 0; y < grid.matrix.length; y++) {
+		let isOutside = true;
+		let previousCorner;
+		for (let x = 0; x < grid.sizeX; x++) {
+			const valueAtPos = grid.get(x,y);
+			if (valueAtPos === ANIMAL) continue;
+			if (valueAtPos === "-") continue;
+			if (valueAtPos === GROUND && !isOutside) count++;
+			if (valueAtPos === "|") {
+				isOutside = !isOutside;
+				continue;
+			}
+			if (previousCorner) {
+				if ((previousCorner === "F" && valueAtPos === "J") || (previousCorner === "L" && valueAtPos === "7")) isOutside = !isOutside
+			}
+			previousCorner = valueAtPos;
+		}
+	}
+	return count;
 };
 
-const getNextSteps = (grid, x, y) => {
-	const valueAtPos = grid.get(x, y);
-	if (valueAtPos === GROUND) throw new Error("Is at ground.");
-	if (valueAtPos === ANIMAL) {
-		// Any pipe attached to this tile
-		const attachedPipes = [];
-		for (const direction of Object.values(Direction)) {
-			const scanCoord = {x: x + direction.x, y: y + direction.y};
-			const valueAtPos = grid.get(scanCoord.x, scanCoord.y);
-			if (!valueAtPos || valueAtPos === GROUND) continue;
-			const pipe = new Pipe(valueAtPos);
-			const isConnectedToAnimal = pipe.exitsTo(reverseDirection(direction));
-			if (!isConnectedToAnimal) continue;
-			attachedPipes.push(scanCoord);
-		}
-		return attachedPipes;
-	} else {
-		const pipe = new Pipe(valueAtPos);
-		return pipe.getExits().map(exit => ({x: x + exit.x, y: y + exit.y}))
-	}
-}
-
-const buildDistanceMap = (grid, originX, originY) => {
-	const distanceMap = new Grid();
-	distanceMap.set(originX, originY, 0);
+const getMainLoop = (grid, originX, originY) => {
 	const visited = [];
 	const frontier = [{x: originX, y: originY}];
 	while (frontier.length > 0) {
 		const xy = frontier.shift();
 		visited.push(xy);
-		for (const adjacent of getNextSteps(grid, xy.x, xy.y)) {
+		for (const adjacent of getAdjacent(grid, xy)) {
 			if (inArray(visited, adjacent) || inArray(frontier, adjacent)) continue;
+			if (grid.isOutside(adjacent.x, adjacent.y)) continue;
+			const adjacentValue = grid.get(adjacent.x, adjacent.y);
+			if (adjacentValue === ANIMAL) continue;
+			if (adjacentValue === GROUND) continue;
 			frontier.push(adjacent);
-			const currentDistance = distanceMap.get(xy.x, xy.y) || 0;
-			distanceMap.set(adjacent.x, adjacent.y, currentDistance + 1);
 		}
 	}
-	return distanceMap;
+	return visited;
 };
 
 const inArray = (array, xy) => {
 	return array.some(element => element.x === xy.x && element.y === xy.y);
 };
-const getDirectionName = direction => {
-	if (direction === Direction.NORTH) return "NORTH";
-	if (direction === Direction.SOUTH) return "SOUTH";
-	if (direction === Direction.WEST) return "WEST";
-	if (direction === Direction.EAST) return "EAST";
-}
+
+const getAdjacent = (grid, xy) => {
+	const valueAtPos = grid.get(xy.x, xy.y);
+	if (valueAtPos === ANIMAL) {
+		return getAttachedPipes(grid, xy);
+	} else {
+		const pipe = new Pipe(valueAtPos);
+		return pipe.getExits().map(exit => ({x: xy.x + exit.x, y: xy.y + exit.y}));
+	}
+};
 
 const reverseDirection = direction => {
 	if (direction === Direction.NORTH) return Direction.SOUTH;
@@ -106,6 +116,19 @@ const parseInput = input => {
 	return data;
 };
 
+const getAttachedPipes = (grid, xy) => {
+	const attachedPipes = [];
+	for (const direction of Directions) {
+		const scanCoord = {x: xy.x + direction.x, y: xy.y + direction.y};
+		const valueAtPos = grid.get(scanCoord.x, scanCoord.y);
+		if (!valueAtPos || valueAtPos === GROUND) continue;
+		const pipe = new Pipe(valueAtPos);
+		const isConnectedToThisTile = pipe.exitsTo(reverseDirection(direction));
+		if (isConnectedToThisTile) attachedPipes.push(scanCoord);
+	}
+	return attachedPipes;
+}
+
 class Pipe {
 	symbol;
 
@@ -120,10 +143,6 @@ class Pipe {
 
 	getExits() {
 		return pipeConnections[this.symbol];
-	}
-
-	toString() {
-		return `Pipe ${this.symbol} exits to ${pipeConnections[this.symbol].map(dir => getDirectionName(dir)).join(", ")}`;
 	}
 }
 
@@ -175,20 +194,11 @@ class Grid {
 		if (!this.matrix[y]) this.matrix[y] = [];
 		this.matrix[y][x] = value;
 	}
-};
 
-const display = (grid) => {
-	for (let y = 0; y < grid.matrix.length; y++) {
-		let line = "";
-		for (let x = 0; x < grid.sizeX; x++) {
-			let v = " " + grid.get(x, y);
-			if (grid.get(x, y) === undefined) v = "  ";
-			line += v;
-		}
-		console.log(line);
+	isOutside (x, y) {
+		return x < 0 || y < 0 || x >= this.sizeX || y >= this.sizeY;
 	}
-};
-
+}
 
 console.time("Elapsed time");
 console.log("Result: ", fn(input));
